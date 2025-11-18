@@ -1,0 +1,167 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: indexer-postgres
+    environment:
+      POSTGRES_DB: indexer_db
+      POSTGRES_USER: indexer_user
+      POSTGRES_PASSWORD: indexer_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U indexer_user -d indexer_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: indexer-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Forward Worker - Ethereum
+  forward-ethereum:
+    build: .
+    container_name: indexer-forward-ethereum
+    environment:
+      DATABASE_URL: postgresql://indexer_user:indexer_password@postgres:5432/indexer_db?sslmode=disable
+      REDIS_URL: redis:6379
+      WEBHOOK_URL: http://localhost:3000/webhooks/payments
+      INDEXER_WEBHOOK_SECRET: your-webhook-secret-here
+      INDEXER_API_KEY: your-api-key-here
+      ERPC_API_KEY: your-erpc-api-key-here
+      CHAIN_ID: 1
+      FORWARD_INTERVAL: 3s
+      LOG_LEVEL: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["./forward", "1"]
+
+  # Forward Worker - Polygon
+  forward-polygon:
+    build: .
+    container_name: indexer-forward-polygon
+    environment:
+      DATABASE_URL: postgresql://indexer_user:indexer_password@postgres:5432/indexer_db?sslmode=disable
+      REDIS_URL: redis:6379
+      WEBHOOK_URL: http://localhost:3000/webhooks/payments
+      INDEXER_WEBHOOK_SECRET: your-webhook-secret-here
+      INDEXER_API_KEY: your-api-key-here
+      ERPC_API_KEY: your-erpc-api-key-here
+      CHAIN_ID: 137
+      FORWARD_INTERVAL: 3s
+      LOG_LEVEL: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["./forward", "137"]
+
+  # Backfill Worker - Ethereum
+  backfill-ethereum:
+    build: .
+    container_name: indexer-backfill-ethereum
+    environment:
+      DATABASE_URL: postgresql://indexer_user:indexer_password@postgres:5432/indexer_db?sslmode=disable
+      REDIS_URL: redis:6379
+      WEBHOOK_URL: http://localhost:3000/webhooks/payments
+      INDEXER_WEBHOOK_SECRET: your-webhook-secret-here
+      INDEXER_API_KEY: your-api-key-here
+      ERPC_API_KEY: your-erpc-api-key-here
+      CHAIN_ID: 1
+      BACKFILL_INTERVAL: 30s
+      BACKFILL_WINDOW_SIZE: 5000
+      LOG_LEVEL: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["./backfill", "1"]
+
+  # Backfill Worker - Polygon
+  backfill-polygon:
+    build: .
+    container_name: indexer-backfill-polygon
+    environment:
+      DATABASE_URL: postgresql://indexer_user:indexer_password@postgres:5432/indexer_db?sslmode=disable
+      REDIS_URL: redis:6379
+      WEBHOOK_URL: http://localhost:3000/webhooks/payments
+      INDEXER_WEBHOOK_SECRET: your-webhook-secret-here
+      INDEXER_API_KEY: your-api-key-here
+      ERPC_API_KEY: your-erpc-api-key-here
+      CHAIN_ID: 137
+      BACKFILL_INTERVAL: 30s
+      BACKFILL_WINDOW_SIZE: 5000
+      LOG_LEVEL: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["./backfill", "137"]
+
+  # Confirmation Worker - Ethereum
+  confirmation-ethereum:
+    build: .
+    container_name: indexer-confirmation-ethereum
+    environment:
+      DATABASE_URL: postgresql://indexer_user:indexer_password@postgres:5432/indexer_db?sslmode=disable
+      REDIS_URL: redis:6379
+      WEBHOOK_URL: http://localhost:3000/webhooks/payments
+      INDEXER_WEBHOOK_SECRET: your-webhook-secret-here
+      INDEXER_API_KEY: your-api-key-here
+      ERPC_API_KEY: your-erpc-api-key-here
+      CHAIN_ID: 1
+      CONFIRMATION_INTERVAL: 30s
+      LOG_LEVEL: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["./confirmation", "1"]
+
+  # Confirmation Worker - Polygon
+  confirmation-polygon:
+    build: .
+    container_name: indexer-confirmation-polygon
+    environment:
+      DATABASE_URL: postgresql://indexer_user:indexer_password@postgres:5432/indexer_db?sslmode=disable
+      REDIS_URL: redis:6379
+      WEBHOOK_URL: http://localhost:3000/webhooks/payments
+      INDEXER_WEBHOOK_SECRET: your-webhook-secret-here
+      INDEXER_API_KEY: your-api-key-here
+      ERPC_API_KEY: your-erpc-api-key-here
+      CHAIN_ID: 137
+      CONFIRMATION_INTERVAL: 30s
+      LOG_LEVEL: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["./confirmation", "137"]
+
+volumes:
+  postgres_data:
+  redis_data:

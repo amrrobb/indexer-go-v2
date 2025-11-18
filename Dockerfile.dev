@@ -1,0 +1,32 @@
+# Development Dockerfile with hot reloading
+FROM golang:1.21-alpine
+
+# Install build dependencies and air for hot reloading
+RUN apk add --no-cache git ca-certificates tzdata
+RUN go install github.com/air-verse/air@latest
+
+# Set working directory
+WORKDIR /app
+
+# Copy go mod files
+COPY go.mod go.sum ./
+
+# Download dependencies
+RUN go mod download
+
+# Copy air configuration
+COPY .air.toml ./
+
+# Copy source code
+COPY . .
+
+# Build once to verify
+RUN go build -o forward ./cmd/forward
+RUN go build -o backfill ./cmd/backfill
+RUN go build -o confirmation ./cmd/confirmation
+
+# Expose port for potential health checks
+EXPOSE 8080
+
+# Default command for development with hot reloading
+CMD ["air", "-c", ".air.toml"]

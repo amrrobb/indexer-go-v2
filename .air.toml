@@ -1,0 +1,82 @@
+# Config file for [Air](https://github.com/cosmtrek/air) in TOML format
+
+# Working directory
+# . or absolute path, please note that the directories following must be under root.
+root = "."
+testdata_dir = "testdata"
+tmp_dir = "tmp"
+
+[build]
+# Just plain old shell command. You could use `make` as well.
+cmd = "go build -o ./tmp/forward ./cmd/forward"
+
+# Binary file yields from `cmd`.
+bin = "tmp/forward"
+
+# Customize binary.
+# Can be used to change the command or binary name
+full_bin = "./tmp/forward"
+
+# Watch these filename extensions.
+include_ext = ["go", "tpl", "tmpl", "html"]
+
+# Ignore these filename extensions or directories.
+exclude_dir = ["assets", "tmp", "vendor", "testdata", "migrations"]
+
+# Watch these directories if you specified.
+include_dir = []
+
+# Exclude these files or directories.
+exclude_file = []
+
+# Exclude specific regular expressions.
+exclude_regex = ["_test.go"]
+
+# Exclude unchanged files.
+exclude_unchanged = true
+
+# Follow symlink for directories
+follow_symlink = true
+
+# This log file places in your tmp_dir.
+log = "air.log"
+
+# Poll files for changes instead of using fsnotify.
+poll = false
+
+# Poll interval (defaults to 10ms).
+poll_interval = 1000 # ms
+
+# It's not necessary to trigger build each time file changes if it's too frequent.
+delay = 1000 # ms
+
+# Stop running old binary when build errors occur.
+stop_on_root = false
+
+# Send Interrupt signal before killing process (windows does not support this feature)
+send_interrupt = false
+
+# Delay after sending Interrupt signal
+kill_delay = "0s"
+
+[log]
+# Show log time
+time = true
+
+# Only show main log (silences watcher, build, runner)
+main_only = false
+
+[color]
+# Customize each part's color. By default these are colors used in [Air](https://github.com/cosmtrek/air)
+main = "magenta"
+watcher = "cyan"
+build = "yellow"
+runner = "green"
+
+[misc]
+# Delete tmp directory on exit
+clean_on_exit = true
+
+[screen]
+clear_on_rebuild = true
+keep_scroll = true

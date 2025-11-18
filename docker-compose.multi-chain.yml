@@ -1,0 +1,167 @@
+version: '3.8'
+
+# Multi-chain forward and backfill workers
+# Connects to existing infrastructure (PostgreSQL, Redis Sentinel, ERPC)
+#
+# Usage:
+#   docker-compose -f docker-compose.multi-chain.yml up -d
+#   docker-compose -f docker-compose.multi-chain.yml logs -f
+#   docker-compose -f docker-compose.multi-chain.yml down
+
+x-worker-base: &worker-base
+  build: .
+  restart: unless-stopped
+  env_file:
+    - .env
+  networks:
+    - indexer-network
+  healthcheck:
+    test: ["CMD", "pgrep", "-x", "forward|backfill"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 10s
+
+x-common-env: &common-env
+  # Database Configuration
+  DATABASE_URL: ${DATABASE_URL}
+  BACKEND_SCHEMA: ${BACKEND_SCHEMA:-public}
+  INDEXER_SCHEMA: ${INDEXER_SCHEMA:-indexer}
+  CONFIG_POOL_MAX_CONNS: ${CONFIG_POOL_MAX_CONNS:-5}
+  CONFIG_POOL_MIN_CONNS: ${CONFIG_POOL_MIN_CONNS:-2}
+  INDEXER_POOL_MAX_CONNS: ${INDEXER_POOL_MAX_CONNS:-10}
+  INDEXER_POOL_MIN_CONNS: ${INDEXER_POOL_MIN_CONNS:-3}
+
+  # Redis Configuration
+  REDIS_SENTINEL: ${REDIS_SENTINEL:-false}
+  REDIS_SENTINEL_URL: ${REDIS_SENTINEL_URL}
+  REDIS_URL: ${REDIS_URL}
+  REDIS_PASSWORD: ${REDIS_PASSWORD}
+  REDIS_DB: ${REDIS_DB:-3}
+  REDIS_POOL_SIZE: ${REDIS_POOL_SIZE:-10}
+
+  # Webhook Configuration
+  WEBHOOK_URL: ${WEBHOOK_URL}
+  INDEXER_API_KEY: ${INDEXER_API_KEY}
+  INDEXER_WEBHOOK_SECRET: ${INDEXER_WEBHOOK_SECRET}
+  WEBHOOK_RETRIES: ${WEBHOOK_RETRIES:-3}
+  WEBHOOK_RETRY_DELAY: ${WEBHOOK_RETRY_DELAY:-5s}
+  WEBHOOK_TIMEOUT: ${WEBHOOK_TIMEOUT:-30s}
+
+  # RPC Timeout Configuration
+  RPC_HTTP_TIMEOUT: ${RPC_HTTP_TIMEOUT:-120s}
+  RPC_DIAL_TIMEOUT: ${RPC_DIAL_TIMEOUT:-30s}
+  RPC_HEADER_TIMEOUT: ${RPC_HEADER_TIMEOUT:-90s}
+
+  # Logging
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  LOG_FORMAT: ${LOG_FORMAT:-json}
+
+  # Performance
+  RPC_BATCH_SIZE: ${RPC_BATCH_SIZE:-100}
+  MAX_PARALLEL_WORKERS: ${MAX_PARALLEL_WORKERS:-5}
+
+services:
+  # =============================================================================
+  # ETHEREUM (Chain ID: 1)
+  # =============================================================================
+  forward-ethereum:
+    <<: *worker-base
+    container_name: indexer-forward-ethereum
+    environment:
+      <<: *common-env
+      CHAIN_ID: 1
+      ETHEREUM_RPC_URL: ${ETHEREUM_RPC_URL}
+      FORWARD_INTERVAL: ${FORWARD_INTERVAL:-5s}
+      FORWARD_BLOCK_RANGE: ${FORWARD_BLOCK_RANGE:-10}
+    command: ["./forward", "--chain=1"]
+
+  backfill-ethereum:
+    <<: *worker-base
+    container_name: indexer-backfill-ethereum
+    environment:
+      <<: *common-env
+      CHAIN_ID: 1
+      ETHEREUM_RPC_URL: ${ETHEREUM_RPC_URL}
+      BACKFILL_INTERVAL: ${BACKFILL_INTERVAL:-15s}
+      BACKFILL_WINDOW_SIZE: ${BACKFILL_WINDOW_SIZE:-5000}
+    command: ["./backfill", "--chain=1"]
+
+  # =============================================================================
+  # POLYGON (Chain ID: 137)
+  # =============================================================================
+  forward-polygon:
+    <<: *worker-base
+    container_name: indexer-forward-polygon
+    environment:
+      <<: *common-env
+      CHAIN_ID: 137
+      POLYGON_RPC_URL: ${POLYGON_RPC_URL}
+      FORWARD_INTERVAL: ${FORWARD_INTERVAL:-5s}
+      FORWARD_BLOCK_RANGE: ${FORWARD_BLOCK_RANGE:-10}
+    command: ["./forward", "--chain=137"]
+
+  backfill-polygon:
+    <<: *worker-base
+    container_name: indexer-backfill-polygon
+    environment:
+      <<: *common-env
+      CHAIN_ID: 137
+      POLYGON_RPC_URL: ${POLYGON_RPC_URL}
+      BACKFILL_INTERVAL: ${BACKFILL_INTERVAL:-15s}
+      BACKFILL_WINDOW_SIZE: ${BACKFILL_WINDOW_SIZE:-5000}
+    command: ["./backfill", "--chain=137"]
+
+  # =============================================================================
+  # ARBITRUM (Chain ID: 42161)
+  # =============================================================================
+  forward-arbitrum:
+    <<: *worker-base
+    container_name: indexer-forward-arbitrum
+    environment:
+      <<: *common-env
+      CHAIN_ID: 42161
+      ARBITRUM_RPC_URL: ${ARBITRUM_RPC_URL}
+      FORWARD_INTERVAL: ${FORWARD_INTERVAL:-5s}
+      FORWARD_BLOCK_RANGE: ${FORWARD_BLOCK_RANGE:-10}
+    command: ["./forward", "--chain=42161"]
+
+  backfill-arbitrum:
+    <<: *worker-base
+    container_name: indexer-backfill-arbitrum
+    environment:
+      <<: *common-env
+      CHAIN_ID: 42161
+      ARBITRUM_RPC_URL: ${ARBITRUM_RPC_URL}
+      BACKFILL_INTERVAL: ${BACKFILL_INTERVAL:-15s}
+      BACKFILL_WINDOW_SIZE: ${BACKFILL_WINDOW_SIZE:-5000}
+    command: ["./backfill", "--chain=42161"]
+
+  # =============================================================================
+  # BSC (Chain ID: 56)
+  # =============================================================================
+  forward-bsc:
+    <<: *worker-base
+    container_name: indexer-forward-bsc
+    environment:
+      <<: *common-env
+      CHAIN_ID: 56
+      BSC_RPC_URL: ${BSC_RPC_URL}
+      FORWARD_INTERVAL: ${FORWARD_INTERVAL:-5s}
+      FORWARD_BLOCK_RANGE: ${FORWARD_BLOCK_RANGE:-10}
+    command: ["./forward", "--chain=56"]
+
+  backfill-bsc:
+    <<: *worker-base
+    container_name: indexer-backfill-bsc
+    environment:
+      <<: *common-env
+      CHAIN_ID: 56
+      BSC_RPC_URL: ${BSC_RPC_URL}
+      BACKFILL_INTERVAL: ${BACKFILL_INTERVAL:-15s}
+      BACKFILL_WINDOW_SIZE: ${BACKFILL_WINDOW_SIZE:-5000}
+    command: ["./backfill", "--chain=56"]
+
+networks:
+  indexer-network:
+    driver: bridge

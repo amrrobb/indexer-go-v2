@@ -1,0 +1,215 @@
+version: '3.8'
+
+services:
+  # Forward Worker - Ethereum (connecting to existing infrastructure)
+  forward-ethereum:
+    build: .
+    container_name: indexer-forward-ethereum
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres-server:5432/postgres?sslmode=disable
+      REDIS_URL: redis://redis-node-standalone:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      WEBHOOK_URL: http://appreal-backend-dev:8000/webhooks/payments
+      INDEXER_WEBHOOK_SECRET: ${INDEXER_WEBHOOK_SECRET:-your-webhook-secret-here}
+      INDEXER_API_KEY: ${INDEXER_API_KEY:-your-api-key-here}
+      ERPC_API_KEY: ${ALCHEMY_API_KEY}
+      CHAIN_ID: 1
+      FORWARD_INTERVAL: 3s
+      LOG_LEVEL: info
+      ETHEREUM_RPC_URL: http://appreal-erpc:4000/ethereum/1
+    depends_on:
+      - postgres-server
+      - redis-node-standalone
+      - appreal-erpc
+    networks:
+      - appreal_dev
+      - appreal-infra
+    command: ["./forward", "1"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Forward Worker - Polygon
+  forward-polygon:
+    build: .
+    container_name: indexer-forward-polygon
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres-server:5432/postgres?sslmode=disable
+      REDIS_URL: redis://redis-node-standalone:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      WEBHOOK_URL: http://appreal-backend-dev:8000/webhooks/payments
+      INDEXER_WEBHOOK_SECRET: ${INDEXER_WEBHOOK_SECRET:-your-webhook-secret-here}
+      INDEXER_API_KEY: ${INDEXER_API_KEY:-your-api-key-here}
+      ERPC_API_KEY: ${ALCHEMY_API_KEY}
+      CHAIN_ID: 137
+      FORWARD_INTERVAL: 3s
+      LOG_LEVEL: info
+      POLYGON_RPC_URL: http://appreal-erpc:4000/polygon/137
+    depends_on:
+      - postgres-server
+      - redis-node-standalone
+      - appreal-erpc
+    networks:
+      - appreal_dev
+      - appreal-infra
+    command: ["./forward", "137"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Backfill Worker - Ethereum
+  backfill-ethereum:
+    build: .
+    container_name: indexer-backfill-ethereum
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres-server:5432/postgres?sslmode=disable
+      REDIS_URL: redis://redis-node-standalone:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      WEBHOOK_URL: http://appreal-backend-dev:8000/webhooks/payments
+      INDEXER_WEBHOOK_SECRET: ${INDEXER_WEBHOOK_SECRET:-your-webhook-secret-here}
+      INDEXER_API_KEY: ${INDEXER_API_KEY:-your-api-key-here}
+      ERPC_API_KEY: ${ALCHEMY_API_KEY}
+      CHAIN_ID: 1
+      BACKFILL_INTERVAL: 30s
+      BACKFILL_WINDOW_SIZE: 2000
+      LOG_LEVEL: info
+      ETHEREUM_RPC_URL: http://appreal-erpc:4000/ethereum/1
+    depends_on:
+      - postgres-server
+      - redis-node-standalone
+      - appreal-erpc
+    networks:
+      - appreal_dev
+      - appreal-infra
+    command: ["./backfill", "1"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Backfill Worker - Polygon
+  backfill-polygon:
+    build: .
+    container_name: indexer-backfill-polygon
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres-server:5432/postgres?sslmode=disable
+      REDIS_URL: redis://redis-node-standalone:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      WEBHOOK_URL: http://appreal-backend-dev:8000/webhooks/payments
+      INDEXER_WEBHOOK_SECRET: ${INDEXER_WEBHOOK_SECRET:-your-webhook-secret-here}
+      INDEXER_API_KEY: ${INDEXER_API_KEY:-your-api-key-here}
+      ERPC_API_KEY: ${ALCHEMY_API_KEY}
+      CHAIN_ID: 137
+      BACKFILL_INTERVAL: 30s
+      BACKFILL_WINDOW_SIZE: 2000
+      LOG_LEVEL: info
+      POLYGON_RPC_URL: http://appreal-erpc:4000/polygon/137
+    depends_on:
+      - postgres-server
+      - redis-node-standalone
+      - appreal-erpc
+    networks:
+      - appreal_dev
+      - appreal-infra
+    command: ["./backfill", "137"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Confirmation Worker - Ethereum
+  confirmation-ethereum:
+    build: .
+    container_name: indexer-confirmation-ethereum
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres-server:5432/postgres?sslmode=disable
+      REDIS_URL: redis://redis-node-standalone:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      WEBHOOK_URL: http://appreal-backend-dev:8000/webhooks/payments
+      INDEXER_WEBHOOK_SECRET: ${INDEXER_WEBHOOK_SECRET:-your-webhook-secret-here}
+      INDEXER_API_KEY: ${INDEXER_API_KEY:-your-api-key-here}
+      ERPC_API_KEY: ${ALCHEMY_API_KEY}
+      CHAIN_ID: 1
+      CONFIRMATION_INTERVAL: 30s
+      LOG_LEVEL: info
+      ETHEREUM_RPC_URL: http://appreal-erpc:4000/ethereum/1
+    depends_on:
+      - postgres-server
+      - redis-node-standalone
+      - appreal-erpc
+    networks:
+      - appreal_dev
+      - appreal-infra
+    command: ["./confirmation", "1"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Confirmation Worker - Polygon
+  confirmation-polygon:
+    build: .
+    container_name: indexer-confirmation-polygon
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres-server:5432/postgres?sslmode=disable
+      REDIS_URL: redis://redis-node-standalone:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      WEBHOOK_URL: http://appreal-backend-dev:8000/webhooks/payments
+      INDEXER_WEBHOOK_SECRET: ${INDEXER_WEBHOOK_SECRET:-your-webhook-secret-here}
+      INDEXER_API_KEY: ${INDEXER_API_KEY:-your-api-key-here}
+      ERPC_API_KEY: ${ALCHEMY_API_KEY}
+      CHAIN_ID: 137
+      CONFIRMATION_INTERVAL: 30s
+      LOG_LEVEL: info
+      POLYGON_RPC_URL: http://appreal-erpc:4000/polygon/137
+    depends_on:
+      - postgres-server
+      - redis-node-standalone
+      - appreal-erpc
+    networks:
+      - appreal_dev
+      - appreal-infra
+    command: ["./confirmation", "137"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# External services that should already be running
+# These are defined here for dependency management but not created
+x-external-services: &external-services
+  postgres-server:
+    external: true
+    name: postgres-server
+  redis-node-standalone:
+    external: true
+    name: redis-node-standalone
+  appreal-backend-dev:
+    external: true
+    name: appreal-backend-dev
+  appreal-erpc:
+    external: true
+    name: appreal-erpc
+
+# Networks (existing from appreal-infra)
+networks:
+  appreal_dev:
+    external: true
+    name: appreal_dev
+  appreal-infra:
+    external: true
+    name: appreal_infra_network
