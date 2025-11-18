@@ -12,7 +12,7 @@ x-worker-base: &worker-base
   build: .
   restart: unless-stopped
   env_file:
-    - .env
+    - .env.docker
   networks:
     - indexer-network
   healthcheck:
@@ -23,43 +23,8 @@ x-worker-base: &worker-base
     start_period: 10s
 
 x-common-env: &common-env
-  # Database Configuration
-  DATABASE_URL: ${DATABASE_URL}
-  BACKEND_SCHEMA: ${BACKEND_SCHEMA:-public}
-  INDEXER_SCHEMA: ${INDEXER_SCHEMA:-indexer}
-  CONFIG_POOL_MAX_CONNS: ${CONFIG_POOL_MAX_CONNS:-5}
-  CONFIG_POOL_MIN_CONNS: ${CONFIG_POOL_MIN_CONNS:-2}
-  INDEXER_POOL_MAX_CONNS: ${INDEXER_POOL_MAX_CONNS:-10}
-  INDEXER_POOL_MIN_CONNS: ${INDEXER_POOL_MIN_CONNS:-3}
-
-  # Redis Configuration
-  REDIS_SENTINEL: ${REDIS_SENTINEL:-false}
-  REDIS_SENTINEL_URL: ${REDIS_SENTINEL_URL}
-  REDIS_URL: ${REDIS_URL}
-  REDIS_PASSWORD: ${REDIS_PASSWORD}
-  REDIS_DB: ${REDIS_DB:-3}
-  REDIS_POOL_SIZE: ${REDIS_POOL_SIZE:-10}
-
-  # Webhook Configuration
-  WEBHOOK_URL: ${WEBHOOK_URL}
-  INDEXER_API_KEY: ${INDEXER_API_KEY}
-  INDEXER_WEBHOOK_SECRET: ${INDEXER_WEBHOOK_SECRET}
-  WEBHOOK_RETRIES: ${WEBHOOK_RETRIES:-3}
-  WEBHOOK_RETRY_DELAY: ${WEBHOOK_RETRY_DELAY:-5s}
-  WEBHOOK_TIMEOUT: ${WEBHOOK_TIMEOUT:-30s}
-
-  # RPC Timeout Configuration
-  RPC_HTTP_TIMEOUT: ${RPC_HTTP_TIMEOUT:-120s}
-  RPC_DIAL_TIMEOUT: ${RPC_DIAL_TIMEOUT:-30s}
-  RPC_HEADER_TIMEOUT: ${RPC_HEADER_TIMEOUT:-90s}
-
-  # Logging
-  LOG_LEVEL: ${LOG_LEVEL:-info}
-  LOG_FORMAT: ${LOG_FORMAT:-json}
-
-  # Performance
-  RPC_BATCH_SIZE: ${RPC_BATCH_SIZE:-100}
-  MAX_PARALLEL_WORKERS: ${MAX_PARALLEL_WORKERS:-5}
+  # All configuration comes from .env.docker
+  # No need to override anything here - the env_file handles it all
 
 services:
   # =============================================================================
