@@ -1,0 +1,97 @@
+// =============================================================================
+// REFERENCE ONLY - NOT USED FOR MIGRATIONS
+// =============================================================================
+// This Prisma schema file is for DOCUMENTATION PURPOSES ONLY.
+//
+// The Go indexer does NOT use Prisma client. All database operations are
+// performed with raw SQL queries via pgxpool.
+//
+// Actual migrations are managed in:
+// - /migrations/*.sql (raw SQL with psql variables)
+// - /cmd/migrate-indexer/migrate.go (Go migration tool)
+//
+// Schema is configurable via environment variables:
+// - INDEXER_SCHEMA=indexer (default)
+// - BACKEND_SCHEMA=public (default, can be appreal_dev, etc.)
+//
+// This file serves as a reference for:
+// - Understanding the database schema structure
+// - Documenting table relationships
+// - Type definitions for the indexer tables
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// INDEXER SCHEMA TABLES (schema name is configurable via INDEXER_SCHEMA env)
+// Default schema: "indexer"
+// =============================================================================
+
+// Indexer worker cursor positions for recovery
+// Tracks the last processed block for each worker type per chain
+model IndexerCursor {
+  id          Int      @id @default(autoincrement())
+  chainId     Int      @map("chain_id")
+  workerType  String   @map("worker_type") // 'forward', 'backfill', 'confirmation'
+  lastBlock   BigInt   @map("last_block")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @map("updated_at")
+
+  @@unique([chainId, workerType])
+  @@map("indexer_cursors")
+  // @@schema("indexer") -- actual schema is configurable
+}
+
+// Table for storing processed blocks to prevent overlap
+// Audit trail of which blocks have been processed by which workers
+model IndexerProcessedBlock {
+  id          Int      @id @default(autoincrement())
+  chainId     Int      @map("chain_id")
+  blockNumber BigInt   @map("block_number")
+  workerType  String   @map("worker_type") // 'forward', 'backfill', 'confirmation'
+  processedAt DateTime @default(now()) @map("processed_at")
+
+  @@unique([chainId, blockNumber, workerType])
+  @@map("indexer_processed_blocks")
+  // @@schema("indexer") -- actual schema is configurable
+}
+
+// Store indexer processing statistics for monitoring
+model IndexerStats {
+  id              Int      @id @default(autoincrement())
+  chainId         Int      @map("chain_id")
+  workerType      String   @map("worker_type")
+  blocksProcessed BigInt   @default(0) @map("blocks_processed")
+  eventsDetected  Int      @default(0) @map("events_detected")
+  eventsConfirmed Int      @default(0) @map("events_confirmed")
+  errorCount      Int      @default(0) @map("error_count")
+  lastActivity    DateTime @default(now()) @map("last_activity")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @default(now()) @map("updated_at")
+
+  @@unique([chainId, workerType])
+  @@map("indexer_stats")
+  // @@schema("indexer") -- actual schema is configurable
+}
+
+// =============================================================================
+// BACKEND SCHEMA TABLES (read-only from indexer perspective)
+// Schema is configurable via BACKEND_SCHEMA env (e.g., "public", "appreal_dev")
+// =============================================================================
+//
+// The indexer reads from these backend tables:
+// - networks (chain configurations)
+// - currencies (token contracts to watch)
+// - wallets (merchant addresses to monitor)
+// - invoices (for status updates after payment detection)
+//
+// These tables are managed by the backend's Prisma schema, not this one.
+// See: /appreal-backend/prisma/schema/ for definitions
+// =============================================================================
