@@ -10,8 +10,8 @@ import (
 )
 
 func main() {
-	// Load .env
-	if err := godotenv.Load(); err != nil {
+	// Load .env and override existing environment variables
+	if err := godotenv.Overload(); err != nil {
 		log.Printf("Warning: Could not load .env file: %v", err)
 	}
 
@@ -80,6 +80,60 @@ func main() {
 	_, err = db.IndexerPool.Exec(ctx, blocksSQL)
 	if err != nil {
 		log.Fatalf("Failed to create indexer_processed_blocks table: %v", err)
+	}
+
+	// Fix constraint for existing tables (if upgrading from old schema)
+	log.Println("Fixing constraint for existing tables...")
+
+	// Step 1: Deduplicate - Keep only the first occurrence of each (chain_id, block_number) pair
+	deduplicateSQL := fmt.Sprintf(`
+		DELETE FROM %s.indexer_processed_blocks a USING %s.indexer_processed_blocks b
+		WHERE a.id > b.id
+		AND a.chain_id = b.chain_id
+		AND a.block_number = b.block_number;
+	`, db.IndexerSchema, db.IndexerSchema)
+
+	result, err := db.IndexerPool.Exec(ctx, deduplicateSQL)
+	if err != nil {
+		log.Printf("Warning: Failed to deduplicate (non-critical): %v", err)
+	} else {
+		rowsDeleted := result.RowsAffected()
+		if rowsDeleted > 0 {
+			log.Printf("Removed %d duplicate rows", rowsDeleted)
+		}
+	}
+
+	// Step 2: Drop the old constraint if it exists
+	dropOldConstraintSQL := fmt.Sprintf(`
+		ALTER TABLE %s.indexer_processed_blocks
+		DROP CONSTRAINT IF EXISTS indexer_processed_blocks_chain_id_block_number_worker_type_key;
+	`, db.IndexerSchema)
+
+	_, err = db.IndexerPool.Exec(ctx, dropOldConstraintSQL)
+	if err != nil {
+		log.Printf("Warning: Failed to drop old constraint (non-critical): %v", err)
+	}
+
+	// Step 3: Add the new constraint (only if it doesn't exist)
+	ensureConstraintSQL := fmt.Sprintf(`
+		DO $$
+		BEGIN
+			IF NOT EXISTS (
+				SELECT 1 FROM pg_constraint
+				WHERE conname = 'indexer_processed_blocks_chain_id_block_number_key'
+			) THEN
+				ALTER TABLE %s.indexer_processed_blocks
+				ADD CONSTRAINT indexer_processed_blocks_chain_id_block_number_key
+				UNIQUE (chain_id, block_number);
+			END IF;
+		END $$;
+	`, db.IndexerSchema)
+
+	_, err = db.IndexerPool.Exec(ctx, ensureConstraintSQL)
+	if err != nil {
+		log.Printf("Warning: Failed to ensure correct constraint (non-critical): %v", err)
+	} else {
+		log.Println("Constraint updated: UNIQUE(chain_id, block_number)")
 	}
 
 	// Create indexes for indexer_processed_blocks

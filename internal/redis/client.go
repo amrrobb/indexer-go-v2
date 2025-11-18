@@ -130,7 +130,12 @@ func NewClientFromSentinelURL(sentinelURL string) (*Client, error) {
 		// If the error is hostname resolution, try direct connection as fallback
 		if strings.Contains(err.Error(), "lookup redis-master") {
 			logger.Warn("Sentinel returned internal Docker hostname, falling back to direct Redis connection")
-			return NewClientFromURL("redis://:admin@localhost:6381/3")
+			// Use REDIS_URL from environment for fallback
+			fallbackURL := os.Getenv("REDIS_URL")
+			if fallbackURL == "" {
+				return nil, fmt.Errorf("failed to connect to Redis Sentinel and REDIS_URL not set: %w", err)
+			}
+			return NewClientFromURL(fallbackURL)
 		}
 		return nil, fmt.Errorf("failed to connect to Redis Sentinel: %w", err)
 	}

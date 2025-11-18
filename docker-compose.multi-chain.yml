@@ -3,6 +3,9 @@ version: '3.8'
 # Multi-chain forward and backfill workers
 # Connects to existing infrastructure (PostgreSQL, Redis Sentinel, ERPC)
 #
+# All configuration comes from .env.docker file
+# No need to override environment variables here
+#
 # Usage:
 #   docker-compose -f docker-compose.multi-chain.yml up -d
 #   docker-compose -f docker-compose.multi-chain.yml logs -f
@@ -16,15 +19,11 @@ x-worker-base: &worker-base
   networks:
     - indexer-network
   healthcheck:
-    test: ["CMD", "pgrep", "-x", "forward|backfill"]
+    test: ["CMD", "sh", "-c", "pgrep forward || pgrep backfill"]
     interval: 30s
     timeout: 10s
     retries: 3
     start_period: 10s
-
-x-common-env: &common-env
-  # All configuration comes from .env.docker
-  # No need to override anything here - the env_file handles it all
 
 services:
   # =============================================================================
@@ -33,23 +32,11 @@ services:
   forward-ethereum:
     <<: *worker-base
     container_name: indexer-forward-ethereum
-    environment:
-      <<: *common-env
-      CHAIN_ID: 1
-      ETHEREUM_RPC_URL: ${ETHEREUM_RPC_URL}
-      FORWARD_INTERVAL: ${FORWARD_INTERVAL:-5s}
-      FORWARD_BLOCK_RANGE: ${FORWARD_BLOCK_RANGE:-10}
     command: ["./forward", "--chain=1"]
 
   backfill-ethereum:
     <<: *worker-base
     container_name: indexer-backfill-ethereum
-    environment:
-      <<: *common-env
-      CHAIN_ID: 1
-      ETHEREUM_RPC_URL: ${ETHEREUM_RPC_URL}
-      BACKFILL_INTERVAL: ${BACKFILL_INTERVAL:-15s}
-      BACKFILL_WINDOW_SIZE: ${BACKFILL_WINDOW_SIZE:-5000}
     command: ["./backfill", "--chain=1"]
 
   # =============================================================================
@@ -58,23 +45,11 @@ services:
   forward-polygon:
     <<: *worker-base
     container_name: indexer-forward-polygon
-    environment:
-      <<: *common-env
-      CHAIN_ID: 137
-      POLYGON_RPC_URL: ${POLYGON_RPC_URL}
-      FORWARD_INTERVAL: ${FORWARD_INTERVAL:-5s}
-      FORWARD_BLOCK_RANGE: ${FORWARD_BLOCK_RANGE:-10}
     command: ["./forward", "--chain=137"]
 
   backfill-polygon:
     <<: *worker-base
     container_name: indexer-backfill-polygon
-    environment:
-      <<: *common-env
-      CHAIN_ID: 137
-      POLYGON_RPC_URL: ${POLYGON_RPC_URL}
-      BACKFILL_INTERVAL: ${BACKFILL_INTERVAL:-15s}
-      BACKFILL_WINDOW_SIZE: ${BACKFILL_WINDOW_SIZE:-5000}
     command: ["./backfill", "--chain=137"]
 
   # =============================================================================
@@ -83,23 +58,11 @@ services:
   forward-arbitrum:
     <<: *worker-base
     container_name: indexer-forward-arbitrum
-    environment:
-      <<: *common-env
-      CHAIN_ID: 42161
-      ARBITRUM_RPC_URL: ${ARBITRUM_RPC_URL}
-      FORWARD_INTERVAL: ${FORWARD_INTERVAL:-5s}
-      FORWARD_BLOCK_RANGE: ${FORWARD_BLOCK_RANGE:-10}
     command: ["./forward", "--chain=42161"]
 
   backfill-arbitrum:
     <<: *worker-base
     container_name: indexer-backfill-arbitrum
-    environment:
-      <<: *common-env
-      CHAIN_ID: 42161
-      ARBITRUM_RPC_URL: ${ARBITRUM_RPC_URL}
-      BACKFILL_INTERVAL: ${BACKFILL_INTERVAL:-15s}
-      BACKFILL_WINDOW_SIZE: ${BACKFILL_WINDOW_SIZE:-5000}
     command: ["./backfill", "--chain=42161"]
 
   # =============================================================================
@@ -108,23 +71,11 @@ services:
   forward-bsc:
     <<: *worker-base
     container_name: indexer-forward-bsc
-    environment:
-      <<: *common-env
-      CHAIN_ID: 56
-      BSC_RPC_URL: ${BSC_RPC_URL}
-      FORWARD_INTERVAL: ${FORWARD_INTERVAL:-5s}
-      FORWARD_BLOCK_RANGE: ${FORWARD_BLOCK_RANGE:-10}
     command: ["./forward", "--chain=56"]
 
   backfill-bsc:
     <<: *worker-base
     container_name: indexer-backfill-bsc
-    environment:
-      <<: *common-env
-      CHAIN_ID: 56
-      BSC_RPC_URL: ${BSC_RPC_URL}
-      BACKFILL_INTERVAL: ${BACKFILL_INTERVAL:-15s}
-      BACKFILL_WINDOW_SIZE: ${BACKFILL_WINDOW_SIZE:-5000}
     command: ["./backfill", "--chain=56"]
 
 networks:
