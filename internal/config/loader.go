@@ -163,7 +163,7 @@ func (l *Loader) getRPCURL(network string) string {
 			return url
 		}
 		return os.Getenv("ERPC_BASE_URL")
-	case "bsc":
+	case "bsc", "binance-smart-chain":
 		if url := os.Getenv("BSC_RPC_URL"); url != "" {
 			return url
 		}
