@@ -19,7 +19,7 @@ x-worker-base: &worker-base
   networks:
     - indexer-network
   healthcheck:
-    test: ["CMD", "sh", "-c", "pgrep forward || pgrep backfill"]
+    test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
     interval: 30s
     timeout: 10s
     retries: 3
@@ -33,11 +33,15 @@ services:
     <<: *worker-base
     container_name: indexer-forward-ethereum
     command: ["./forward", "--chain=1"]
+    ports:
+      - "${ETHEREUM_FORWARD_PORT:-7002}:${HEALTH_CHECK_PORT:-8080}"
 
   backfill-ethereum:
     <<: *worker-base
     container_name: indexer-backfill-ethereum
     command: ["./backfill", "--chain=1"]
+    ports:
+      - "${ETHEREUM_BACKFILL_PORT:-7001}:${HEALTH_CHECK_PORT:-8080}"
 
   # =============================================================================
   # POLYGON (Chain ID: 137)
@@ -46,11 +50,15 @@ services:
     <<: *worker-base
     container_name: indexer-forward-polygon
     command: ["./forward", "--chain=137"]
+    ports:
+      - "${POLYGON_FORWARD_PORT:-7004}:${HEALTH_CHECK_PORT:-8080}"
 
   backfill-polygon:
     <<: *worker-base
     container_name: indexer-backfill-polygon
     command: ["./backfill", "--chain=137"]
+    ports:
+      - "${POLYGON_BACKFILL_PORT:-7003}:${HEALTH_CHECK_PORT:-8080}"
 
   # =============================================================================
   # ARBITRUM (Chain ID: 42161)
@@ -59,11 +67,15 @@ services:
     <<: *worker-base
     container_name: indexer-forward-arbitrum
     command: ["./forward", "--chain=42161"]
+    ports:
+      - "${ARBITRUM_FORWARD_PORT:-7006}:${HEALTH_CHECK_PORT:-8080}"
 
   backfill-arbitrum:
     <<: *worker-base
     container_name: indexer-backfill-arbitrum
     command: ["./backfill", "--chain=42161"]
+    ports:
+      - "${ARBITRUM_BACKFILL_PORT:-7005}:${HEALTH_CHECK_PORT:-8080}"
 
   # =============================================================================
   # BSC (Chain ID: 56)
@@ -72,11 +84,15 @@ services:
     <<: *worker-base
     container_name: indexer-forward-bsc
     command: ["./forward", "--chain=56"]
+    ports:
+      - "${BSC_FORWARD_PORT:-7008}:${HEALTH_CHECK_PORT:-8080}"
 
   backfill-bsc:
     <<: *worker-base
     container_name: indexer-backfill-bsc
     command: ["./backfill", "--chain=56"]
+    ports:
+      - "${BSC_BACKFILL_PORT:-7007}:${HEALTH_CHECK_PORT:-8080}"
 
 networks:
   indexer-network:

@@ -52,6 +52,11 @@ func main() {
 
 	components.Logger.Info("Forward worker initialized successfully")
 
+	// Start health check server
+	healthServer := common.NewHealthServer()
+	healthServer.Start()
+	defer healthServer.Stop(shutdownManager.GetContext())
+
 	// Start worker in goroutine with shutdown handling
 	go func() {
 		if err := forwardWorker.Start(shutdownManager.GetContext()); err != nil {

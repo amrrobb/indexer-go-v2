@@ -148,28 +148,16 @@ func (l *Loader) LoadConfiguration(ctx context.Context) (*ConfigCache, error) {
 func (l *Loader) getRPCURL(network string) string {
 	switch network {
 	case "ethereum":
-		if url := os.Getenv("ETHEREUM_RPC_URL"); url != "" {
-			return url
-		}
-		// Fallback to ERPC
-		return os.Getenv("ERPC_BASE_URL")
+		return os.Getenv("ETHEREUM_RPC_URL")
 	case "polygon", "polygon-pos":
-		if url := os.Getenv("POLYGON_RPC_URL"); url != "" {
-			return url
-		}
-		return os.Getenv("ERPC_BASE_URL")
+		return os.Getenv("POLYGON_RPC_URL")
 	case "arbitrum", "arbitrum-one":
-		if url := os.Getenv("ARBITRUM_RPC_URL"); url != "" {
-			return url
-		}
-		return os.Getenv("ERPC_BASE_URL")
+		return os.Getenv("ARBITRUM_RPC_URL")
 	case "bsc", "binance-smart-chain":
-		if url := os.Getenv("BSC_RPC_URL"); url != "" {
-			return url
-		}
-		return os.Getenv("ERPC_BASE_URL")
+		return os.Getenv("BSC_RPC_URL")
 	default:
-		return os.Getenv("ERPC_BASE_URL")
+		// Unknown network - return empty string
+		return ""
 	}
 }
 

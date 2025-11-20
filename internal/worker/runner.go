@@ -4,8 +4,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -105,6 +107,14 @@ func (r *WorkerRunner) Run(chainID int, createWorker func(*config.Loader, *datab
 
 	logger.Info("Worker initialized successfully")
 
+	// Start health check server
+	healthServer := &healthServer{
+		port:   getEnvAsInt("HEALTH_CHECK_PORT", 8080),
+		logger: logger.WithField("component", "health_server"),
+	}
+	healthServer.start()
+	defer healthServer.stop(ctx)
+
 	// Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
@@ -185,4 +195,60 @@ func RunWorker(workerType WorkerType) error {
 	default:
 		return fmt.Errorf("unknown worker type: %s", workerType)
 	}
+}
+
+// healthServer provides a simple HTTP health check endpoint for workers
+type healthServer struct {
+	server *http.Server
+	logger *logrus.Entry
+	port   int
+}
+
+func (h *healthServer) start() {
+	mux := http.NewServeMux()
+
+	// Simple health endpoint
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
+	// Root endpoint
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Indexer Worker Running"))
+	})
+
+	h.server = &http.Server{
+		Addr:         fmt.Sprintf(":%d", h.port),
+		Handler:      mux,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 5 * time.Second,
+	}
+
+	go func() {
+		h.logger.WithField("port", h.port).Info("Health check server starting")
+		if err := h.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			h.logger.WithError(err).Error("Health check server failed")
+		}
+	}()
+}
+
+func (h *healthServer) stop(ctx context.Context) {
+	if h.server != nil {
+		h.logger.Info("Shutting down health check server")
+		shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		h.server.Shutdown(shutdownCtx)
+	}
+}
+
+// getEnvAsInt reads an environment variable as integer with a fallback default
+func getEnvAsInt(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		if intValue, err := strconv.Atoi(value); err == nil {
+			return intValue
+		}
+	}
+	return defaultValue
 }
