@@ -115,6 +115,48 @@ func (r *WorkerRunner) Run(chainID int, createWorker func(*config.Loader, *datab
 	healthServer.start()
 	defer healthServer.stop(ctx)
 
+	// Start config change listener if enabled
+	if os.Getenv("CONFIG_AUTO_RELOAD") == "true" {
+		logger.Info("Config auto-reload is ENABLED - will reload on database changes")
+
+		listener := config.NewConfigChangeListener(db.ConfigPool, configLoader)
+
+		// Start listener in goroutine
+		go func() {
+			if err := listener.Start(ctx); err != nil {
+				if err != context.Canceled {
+					logger.WithError(err).Error("Config listener stopped with error")
+				}
+			}
+		}()
+
+		// Subscribe to config change events
+		configChanges := listener.GetReloadChannel()
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case notification := <-configChanges:
+					logger.WithFields(logrus.Fields{
+						"table":      notification.Table,
+						"operation":  notification.Operation,
+						"network_id": notification.NetworkID,
+					}).Info("📡 Config change detected - triggering worker reload")
+
+					// Trigger config reload based on worker type
+					if reloader, ok := worker.(interface{ TriggerConfigReload() }); ok {
+						reloader.TriggerConfigReload()
+					} else {
+						logger.Warn("Worker does not support config reload")
+					}
+				}
+			}
+		}()
+	} else {
+		logger.Warn("Config auto-reload is DISABLED - workers must be restarted to detect wallet/currency changes")
+	}
+
 	// Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)

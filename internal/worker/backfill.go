@@ -19,17 +19,18 @@ import (
 
 // BackfillWorker processes historical blocks to fill gaps
 type BackfillWorker struct {
-	config      *config.Loader
-	db          *database.Client
-	redis       *redispkg.Client
-	rpcClient   *rpc.Client
-	decoder     *decoder.Decoder
-	webhook     *webhook.Client
-	chainID     int
-	workerType  string
-	logger      *logrus.Entry
-	interval    time.Duration
-	windowSize  int64
+	config        *config.Loader
+	db            *database.Client
+	redis         *redispkg.Client
+	rpcClient     *rpc.Client
+	decoder       *decoder.Decoder
+	webhook       *webhook.Client
+	chainID       int
+	workerType    string
+	logger        *logrus.Entry
+	interval      time.Duration
+	windowSize    int64
+	reloadChannel chan bool // Channel to signal config reload
 }
 
 // NewBackfillWorker creates a new backfill worker
@@ -66,17 +67,18 @@ func NewBackfillWorker(
 	})
 
 	return &BackfillWorker{
-		config:     config,
-		db:         db,
-		redis:      redis,
-		rpcClient:  rpcClient,
-		decoder:    decoder.NewDecoder(),
-		webhook:    webhook,
-		chainID:    chainID,
-		workerType: types.WorkerTypeBackfill,
-		logger:     logger,
-		interval:   interval,
-		windowSize:  windowSize,
+		config:        config,
+		db:            db,
+		redis:         redis,
+		rpcClient:     rpcClient,
+		decoder:       decoder.NewDecoder(),
+		webhook:       webhook,
+		chainID:       chainID,
+		workerType:    types.WorkerTypeBackfill,
+		logger:        logger,
+		interval:      interval,
+		windowSize:    windowSize,
+		reloadChannel: make(chan bool, 1), // Buffered to avoid blocking
 	}, nil
 }
 
@@ -84,7 +86,7 @@ func NewBackfillWorker(
 func (w *BackfillWorker) Start(ctx context.Context) error {
 	w.logger.Info("Starting backfill worker")
 
-	// Load configuration
+	// Load initial configuration
 	workerConfig, err := w.config.GetWorkerConfig(w.chainID)
 	if err != nil {
 		return fmt.Errorf("failed to load worker configuration: %w", err)
@@ -98,17 +100,46 @@ func (w *BackfillWorker) Start(ctx context.Context) error {
 	}).Info("Backfill worker configuration loaded")
 
 	// Main processing loop
+	ticker := time.NewTicker(w.interval)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			w.logger.Info("Backfill worker stopped")
 			return ctx.Err()
 
-		case <-time.After(w.interval):
+		case <-w.reloadChannel:
+			// Config change detected - reload configuration
+			w.logger.Info("🔄 Reloading worker configuration...")
+			newConfig, err := w.config.GetWorkerConfig(w.chainID)
+			if err != nil {
+				w.logger.WithError(err).Error("Failed to reload configuration - keeping old config")
+			} else {
+				workerConfig = newConfig
+				w.logger.WithFields(logrus.Fields{
+					"network":            workerConfig.Network,
+					"active_currencies":  len(workerConfig.ActiveCurrencies),
+					"watched_addresses":  len(workerConfig.WatchedAddresses),
+					"window_size":        w.windowSize,
+				}).Info("✅ Configuration reloaded successfully")
+			}
+
+		case <-ticker.C:
 			if err := w.processOnce(ctx, workerConfig); err != nil {
 				w.logger.WithError(err).Error("Error in backfill worker iteration")
 			}
 		}
+	}
+}
+
+// TriggerConfigReload signals the worker to reload its configuration
+func (w *BackfillWorker) TriggerConfigReload() {
+	select {
+	case w.reloadChannel <- true:
+		w.logger.Debug("Config reload signal sent")
+	default:
+		w.logger.Debug("Config reload already pending")
 	}
 }
 

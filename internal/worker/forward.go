@@ -18,16 +18,17 @@ import (
 
 // ForwardWorker processes blocks in near real-time
 type ForwardWorker struct {
-	config      *config.Loader
-	db          *database.Client
-	redis       *redispkg.Client
-	rpcClient   *rpc.Client
-	decoder     *decoder.Decoder
-	webhook     *webhook.Client
-	chainID     int
-	workerType  string
-	logger      *logrus.Entry
-	interval    time.Duration
+	config        *config.Loader
+	db            *database.Client
+	redis         *redispkg.Client
+	rpcClient     *rpc.Client
+	decoder       *decoder.Decoder
+	webhook       *webhook.Client
+	chainID       int
+	workerType    string
+	logger        *logrus.Entry
+	interval      time.Duration
+	reloadChannel chan bool // Channel to signal config reload
 }
 
 // NewForwardWorker creates a new forward worker
@@ -55,16 +56,17 @@ func NewForwardWorker(
 	})
 
 	return &ForwardWorker{
-		config:     config,
-		db:         db,
-		redis:      redis,
-		rpcClient:  rpcClient,
-		decoder:    decoder.NewDecoder(),
-		webhook:    webhook,
-		chainID:    chainID,
-		workerType: types.WorkerTypeForward,
-		logger:     logger,
-		interval:   interval,
+		config:        config,
+		db:            db,
+		redis:         redis,
+		rpcClient:     rpcClient,
+		decoder:       decoder.NewDecoder(),
+		webhook:       webhook,
+		chainID:       chainID,
+		workerType:    types.WorkerTypeForward,
+		logger:        logger,
+		interval:      interval,
+		reloadChannel: make(chan bool, 1), // Buffered to avoid blocking
 	}, nil
 }
 
@@ -72,7 +74,7 @@ func NewForwardWorker(
 func (w *ForwardWorker) Start(ctx context.Context) error {
 	w.logger.Info("Starting forward worker")
 
-	// Load configuration
+	// Load initial configuration
 	workerConfig, err := w.config.GetWorkerConfig(w.chainID)
 	if err != nil {
 		return fmt.Errorf("failed to load worker configuration: %w", err)
@@ -86,17 +88,46 @@ func (w *ForwardWorker) Start(ctx context.Context) error {
 	}).Info("Forward worker configuration loaded")
 
 	// Main processing loop
+	ticker := time.NewTicker(w.interval)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			w.logger.Info("Forward worker stopped")
 			return ctx.Err()
 
-		case <-time.After(w.interval):
+		case <-w.reloadChannel:
+			// Config change detected - reload configuration
+			w.logger.Info("🔄 Reloading worker configuration...")
+			newConfig, err := w.config.GetWorkerConfig(w.chainID)
+			if err != nil {
+				w.logger.WithError(err).Error("Failed to reload configuration - keeping old config")
+			} else {
+				workerConfig = newConfig
+				w.logger.WithFields(logrus.Fields{
+					"network":            workerConfig.Network,
+					"active_currencies":  len(workerConfig.ActiveCurrencies),
+					"watched_addresses":  len(workerConfig.WatchedAddresses),
+					"confirmations":      workerConfig.TargetConfirmations,
+				}).Info("✅ Configuration reloaded successfully")
+			}
+
+		case <-ticker.C:
 			if err := w.processOnce(ctx, workerConfig); err != nil {
 				w.logger.WithError(err).Error("Error in forward worker iteration")
 			}
 		}
+	}
+}
+
+// TriggerConfigReload signals the worker to reload its configuration
+func (w *ForwardWorker) TriggerConfigReload() {
+	select {
+	case w.reloadChannel <- true:
+		w.logger.Debug("Config reload signal sent")
+	default:
+		w.logger.Debug("Config reload already pending")
 	}
 }
 
